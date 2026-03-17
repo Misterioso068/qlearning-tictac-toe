@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <limits.h>
 #include <time.h> 
 
 #include "error_logger.h"
@@ -171,7 +172,7 @@ int check_winner(Board* b) {
 }
 
 // Self-play training
-void train(const char* filename) {
+void train(const char* filename, int iterations) {
     float epsilon = 1.0f;
     float epsilon_min   = 0.01f;
     float epsilon_decay = 0.9999999f;
@@ -186,7 +187,7 @@ void train(const char* filename) {
     int wins1 = 0;
     int wins2 = 0;
     int ties = 0;
-    for (int i = 0; i < 100000000; i++) {
+    for (int i = 0; i < iterations; i++) {
         if (i % 1000000 == 0) {
             printf("Game %d | epsilon=%f | X:%d O:%d T:%d\n",
                 i, a1->epsilon, wins1, wins2, ties);
@@ -358,6 +359,7 @@ int main(int argc, char* argv[]) {
 
     int mode = -1; // 0 = play, 1 = train
     int difficulty = -1;
+    int training_games = -1;
     char* filename = NULL;
 
     for (int i = 1; i < argc; i++) {
@@ -375,6 +377,20 @@ int main(int argc, char* argv[]) {
                 return 1;
             }
             i++; // skip next arg
+        }
+        else if (strcmp(argv[i], "-I") == 0) {
+            if (i + 1 >= argc) {
+                error("Missing training game count after -I\n");
+                return 1;
+            }
+            long count = strtol(argv[i + 1], NULL, 10);
+            if (count <= 0 || count > INT_MAX) {
+                error("Invalid iteration count");
+                return 1;
+            }
+
+            training_games = (int)count;
+            i++;
         }
         else if (strcmp(argv[i], "-F") == 0) {
             if (i + 1 >= argc) {
@@ -415,6 +431,10 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    if (training_games == -1) {
+        training_games = 100000; // default
+    }
+
     float epsilon;
     switch (difficulty) {
         case 0:
@@ -441,13 +461,8 @@ int main(int argc, char* argv[]) {
             epsilon = 0.5f;
     }
 
-    printf("Mode: %s\n", mode == 0 ? "play" : "train");
-    if (difficulty != -1) printf("Difficulty (epsilon): %0.1f\n", epsilon);
-    else printf("Difficulty not provided. Epsilon is defaulting to 0.5.\n");
-    printf("File Path: %s\n", filename);
-
     if (mode == 0) play(filename, epsilon);
-    else train(filename);
+    else train(filename, training_games);
 
     return 0;
 }

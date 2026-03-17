@@ -77,16 +77,37 @@ The program is run from the terminal using **command-line arguments**.
     
     -   `impossible` (epsilon = 0.0)
 
+    - Default value: `easy`
+
+-   `-I <games>` — Number of self-play games used during training.
+
+    - Only applies when `-M train` is used.
+
+    - Default value: `100000`
+
 ### Examples
-Train a new agent:
+Train a an agent (default 100,000 games):
 ```bash
 ./build/tictactoe -M train -F agents/agent1.bin
+```
+
+Train an agent with a custom number of games:
+```bash
+./build/tictactoe -M train -F agents/agent1.bin -I 1000000
 ```
 
 Play against the trained agent (hard difficulty):
 ```bash
 ./build/tictactoe -M play -F agents/agent1.bin -D hard
 ```
+
+Play against the agent with perfect play:
+```bash
+./build/tictactoe -M play -F agents/agent1.bin -D impossible
+```
+
+**Note:** 
+If the agent has not been trained for at least 100,000 games, the difficulty levels may not behave as expected. For example, the impossible difficulty may still make suboptimal moves if the agent has not fully learned optimal play.
 
 * * * * *
 
