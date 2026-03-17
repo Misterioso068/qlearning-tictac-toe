@@ -170,7 +170,8 @@ int check_winner(Board* b) {
     return 3; // tie
 }
 
-void train() {
+// Self-play training
+void train(const char* filename) {
     float epsilon = 1.0f;
     float epsilon_min   = 0.01f;
     float epsilon_decay = 0.9999999f;
@@ -178,7 +179,7 @@ void train() {
 
     Agent* a1 = create_agent(epsilon, alpha);
 
-    if (!load_Q_table(a1, "agent1.bin")) {
+    if (!load_Q_table(a1, filename)) {
         printf("Starting new agent a1\n");
     }
 
@@ -249,7 +250,7 @@ void train() {
         if (a1->epsilon < epsilon_min) a1->epsilon = epsilon_min;
     }
 
-    save_Q_table(a1, "agent1.bin");
+    save_Q_table(a1, filename);
     free_agent(a1);
 }
 
@@ -275,7 +276,17 @@ int human_move(Board* b) {
 
     while (1) {
         printf("Enter move (0-8): ");
-        scanf("%d", &move);
+        
+        int result = scanf("%d", &move);
+
+        if (result != 1) {
+            printf("Invalid input. Please enter a number between 0 and 8.\n");
+
+            // Clear the input buffer
+            int c;
+            while ((c = getchar()) != '\n' && c != EOF);
+            continue;
+        }
 
         if (move < 0 || move > 8) {
             printf("Invalid square.\n");
@@ -291,10 +302,10 @@ int human_move(Board* b) {
     }
 }
 
-void play() {
-    Agent* agent = create_agent(0.3f, 0.0f); // no exploration
+void play(const char* filename, float epsilon) {
+    Agent* agent = create_agent(epsilon, 0.0f); // epsilon = 0.0f perfect play (no exploration)
 
-    if (!load_Q_table(agent, "agent1.bin")) {
+    if (!load_Q_table(agent, filename)) {
         printf("No trained agent found.\n");
         return;
     }
@@ -341,34 +352,102 @@ void play() {
     free_agent(agent);
 }
 
-/*
-Agent* easy = create_agent(0.3f, 0.0f);  // 30% random
-Agent* medium = create_agent(0.1f, 0.0f); // 10% random
-Agent* hard = create_agent(0.0f, 0.0f);  // perfect
-*/
-
 int main(int argc, char* argv[]) {
     // Seed randomness
     srand(time(NULL));
 
-    switch (argc) {
-        case 2:
-            if (strcmp(argv[1], "play") == 0) {
-                play();
+    int mode = -1; // 0 = play, 1 = train
+    int difficulty = -1;
+    char* filename = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-M") == 0) {
+            if (i + 1 >= argc) { // check bounds
+                error("Missing mode after -M\n");
+                return 1;
             }
-            else if (strcmp(argv[1], "train") == 0) {
-                train();
-            }
+            if (strcmp(argv[i + 1], "play") == 0)
+                mode = 0;
+            else if (strcmp(argv[i + 1], "train") == 0)
+                mode = 1;
             else {
-                error("Invalid arguments");
-                warning("Try \"./tictactoe play\" or \"./tictactoe train\"\n");
+                fprintf(stderr, "Invalid mode: %s\n", argv[i + 1]);
+                return 1;
             }
+            i++; // skip next arg
+        }
+        else if (strcmp(argv[i], "-F") == 0) {
+            if (i + 1 >= argc) {
+                error("Missing filename after -F\n");
+                return 1;
+            }
+            filename = argv[i + 1];
+            i++;
+        }
+        else if (strcmp(argv[i], "-D") == 0) {
+            if (i + 1 >= argc) {
+                error("Missing difficulty after -D\n");
+                return 1;
+            }
+            if (strcmp(argv[i + 1], "easy") == 0)
+                difficulty = 0;
+            else if (strcmp(argv[i + 1], "medium") == 0)
+                difficulty = 1;
+            else if (strcmp(argv[i + 1], "hard") == 0)
+                difficulty = 2;
+            else if (strcmp(argv[i + 1], "impossible") == 0)
+                difficulty = 3;
+            else {
+                fprintf(stderr, "Invalid difficulty: %s\n", argv[i + 1]);
+                return 1;
+            }
+            i++;
+        }
+        else {
+            fprintf(stderr, "Unknown argument: %s\n", argv[i]);
+            return 1;
+        }
+    }
+
+    // check required arguments
+    if (mode == -1 || filename == NULL) {
+        warning("Correct Usage: ./tictactoe -M <play|train> -F <filename>\n");
+        return 1;
+    }
+
+    float epsilon;
+    switch (difficulty) {
+        case 0:
+            // Easy
+            epsilon = 0.5f;
+            break;
+
+        case 1:
+            // Medium
+            epsilon = 0.3f;
+            break;
+
+        case 2:
+            // Hard
+            epsilon = 0.1f;
+            break;
+
+        case 3:
+            // Impossible
+            epsilon = 0.0f;
             break;
 
         default:
-            error("Invalid argument count");
-            warning("Try \"./tictactoe play\" or \"./tictactoe train\"\n");
+            epsilon = 0.5f;
     }
+
+    printf("Mode: %s\n", mode == 0 ? "play" : "train");
+    if (difficulty != -1) printf("Difficulty (epsilon): %0.1f\n", epsilon);
+    else printf("Difficulty not provided. Epsilon is defaulting to 0.5.\n");
+    printf("File Path: %s\n", filename);
+
+    if (mode == 0) play(filename, epsilon);
+    else train(filename);
 
     return 0;
 }
